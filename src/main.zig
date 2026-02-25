@@ -362,7 +362,7 @@ const Interpreter = struct {
         return true;
     }
 
-    fn execTokens(self: *Interpreter, text: []const u8) !bool {
+    fn execTokens(self: *Interpreter, text: []const u8) anyerror!bool {
         var i: usize = 0;
 
         while (i < text.len) {
@@ -414,6 +414,27 @@ const Interpreter = struct {
             const ts = i;
             while (i < text.len and text[i] != ' ' and text[i] != '\t') : (i += 1) {}
             const token = text[ts..i];
+
+            // include: load and execute a file
+            if (std.mem.eql(u8, token, "include")) {
+                // Get filename (next token)
+                while (i < text.len and (text[i] == ' ' or text[i] == '\t')) : (i += 1) {}
+                const fn_start = i;
+                while (i < text.len and text[i] != ' ' and text[i] != '\t') : (i += 1) {}
+                const filename = text[fn_start..i];
+                if (filename.len == 0) {
+                    try self.stdout.writeAll("error: 'include' requires a filename\n");
+                    continue;
+                }
+                const ran = execFile(self, filename) catch {
+                    try self.stdout.writeAll("error: cannot open file: ");
+                    try self.stdout.writeAll(filename);
+                    try self.stdout.writeAll("\n");
+                    continue;
+                };
+                if (!ran) return false;
+                continue;
+            }
 
             const should_continue = try self.execToken(token);
             if (!should_continue) return false;
