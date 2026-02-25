@@ -69,10 +69,11 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // Link readline for REPL support (not available on Windows)
+    // Link readline for REPL support (optional, not available on Windows)
     const resolved = exe.root_module.resolved_target.?;
     const os_tag = resolved.result.os.tag;
-    if (os_tag != .windows) {
+    const enable_readline = b.option(bool, "readline", "Enable readline support (default: true on Linux x86_64)") orelse (os_tag != .windows and resolved.result.cpu.arch == .x86_64);
+    if (enable_readline) {
         exe.root_module.linkSystemLibrary("readline", .{ .preferred_link_mode = .static });
         exe.root_module.linkSystemLibrary("tinfo", .{ .preferred_link_mode = .static });
     }
@@ -80,7 +81,7 @@ pub fn build(b: *std.Build) void {
 
     // Pass build option so main.zig knows if readline is available
     const options = b.addOptions();
-    options.addOption(bool, "has_readline", os_tag != .windows);
+    options.addOption(bool, "has_readline", enable_readline);
     exe.root_module.addOptions("build_options", options);
 
     // This declares intent for the executable to be installed into the
