@@ -504,6 +504,21 @@ const Interpreter = struct {
             try self.stdout.writeAll("\n");
         } else if (std.mem.eql(u8, token, "clear")) {
             self.stack.top = 0;
+        } else if (std.mem.eql(u8, token, ">float") or std.mem.eql(u8, token, "s>f")) {
+            const val = self.stack.pop() catch {
+                try self.stdout.writeAll("error: stack underflow\n");
+                return true;
+            };
+            const f: f64 = switch (val) {
+                .int => |v| @floatFromInt(v),
+                .float => |v| v,
+                .string => {
+                    try self.stdout.writeAll("error: cannot convert string to float\n");
+                    self.stack.push(val) catch {};
+                    return true;
+                },
+            };
+            self.stack.push(Value{ .float = f }) catch {};
         } else if (std.mem.eql(u8, token, "words")) {
             try self.dict.listWords(self.stdout);
         } else if (token.len == 1 and (token[0] == '+' or token[0] == '-' or token[0] == '*' or token[0] == '/')) {
