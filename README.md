@@ -10,6 +10,8 @@ zig build
 
 Binary is output to `./zig-out/bin/zf`.
 
+Compilation has been tested with zig 0.15.2
+
 ## Usage
 
 ```

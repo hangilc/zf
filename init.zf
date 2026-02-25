@@ -1,0 +1,2 @@
+: bmi (h w -- bmi) swap 100 / dup * / . ;
+
