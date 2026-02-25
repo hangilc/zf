@@ -1,3 +1,1 @@
-\ Hello World in zf
-: hello ." Hello from zf!" cr ;
-hello
+." Hello, World!" cr

@@ -185,7 +185,11 @@ With step:
 : square ( n -- n*n ) dup * ;  \ with stack effect
 ```
 
-### Other
+### File Loading
+
+```forth
+include lib.fs    \ Load and execute a Forth file
+```
 
 ### Type Conversion
 
@@ -206,7 +210,7 @@ See the `examples/` directory:
 
 - `hello.fs` — Hello World
 - `fizzbuzz.fs` — FizzBuzz 1–100
-- `multiline.fs` — Recursive factorial
+- `factorial.fs` — Recursive factorial
 
 ## License
 
