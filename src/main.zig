@@ -1,8 +1,9 @@
 const std = @import("std");
-const rl = @cImport({
+const build_options = @import("build_options");
+const rl = if (build_options.has_readline) @cImport({
     @cInclude("readline/readline.h");
     @cInclude("readline/history.h");
-});
+}) else struct {};
 
 // === Value ===
 const Value = union(enum) {
@@ -1221,7 +1222,7 @@ pub fn main() !void {
 
     if (file_count > 0) {
         if (!skip_rc) {
-            if (std.posix.getenv("HOME")) |home| {
+            if (getHomePath()) |home| {
                 var rc_path_buf: [256]u8 = undefined;
                 const rc_path_len = home.len + 6;
                 if (rc_path_len <= rc_path_buf.len) {
@@ -1250,7 +1251,7 @@ pub fn main() !void {
     }
 
     // Load ~/.zfrc if it exists
-    if (!skip_rc) if (std.posix.getenv("HOME")) |home| {
+    if (!skip_rc) if (getHomePath()) |home| {
         var rc_path_buf: [256]u8 = undefined;
         const rc_path_len = home.len + 6; // "/.zfrc"
         if (rc_path_len <= rc_path_buf.len) {
@@ -1264,16 +1265,14 @@ pub fn main() !void {
     try stdout.writeAll("zf - a Forth in Zig\n");
 
     const stdin = std.fs.File.stdin();
-    const is_tty = std.posix.isatty(stdin.handle);
+    const use_readline = comptime build_options.has_readline;
+    const is_tty = if (comptime @hasDecl(std.posix, "isatty")) std.posix.isatty(stdin.handle) else false;
 
-    // Load history
-    if (is_tty) {
+    if (use_readline and is_tty) {
+        // Readline REPL
         if (getHistoryPath()) |path| {
             _ = rl.read_history(&path);
         }
-    }
-
-    if (is_tty) {
         while (true) {
             const prompt: [*c]const u8 = if (interp.compiling) "  ] " else "zf> ";
             const line_ptr = rl.readline(prompt);
@@ -1289,12 +1288,11 @@ pub fn main() !void {
             std.c.free(line_ptr.?);
             if (!should_continue) break;
         }
-        // Save history
         if (getHistoryPath()) |path| {
             _ = rl.write_history(&path);
         }
     } else {
-        // Non-TTY: plain stdin read (pipe mode)
+        // Plain stdin REPL (pipe mode or no readline)
         var buf: [1024]u8 = undefined;
         while (true) {
             if (interp.compiling) {
@@ -1317,8 +1315,14 @@ pub fn main() !void {
     }
 }
 
+fn getHomePath() ?[]const u8 {
+    if (comptime @import("builtin").os.tag == .windows) return null;
+    return std.posix.getenv("HOME");
+}
+
 fn getHistoryPath() ?[256]u8 {
-    const home = std.posix.getenv("HOME") orelse return null;
+    if (comptime !build_options.has_readline) return null;
+    const home = getHomePath() orelse return null;
     const suffix = "/.zf_history";
     if (home.len + suffix.len >= 256) return null;
     var buf: [256]u8 = undefined;

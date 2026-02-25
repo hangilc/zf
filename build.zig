@@ -69,9 +69,18 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // Link readline for REPL support
-    exe.root_module.linkSystemLibrary("readline", .{});
+    // Link readline for REPL support (not available on Windows)
+    const resolved = exe.root_module.resolved_target.?;
+    const os_tag = resolved.result.os.tag;
+    if (os_tag != .windows) {
+        exe.root_module.linkSystemLibrary("readline", .{});
+    }
     exe.linkLibC();
+
+    // Pass build option so main.zig knows if readline is available
+    const options = b.addOptions();
+    options.addOption(bool, "has_readline", os_tag != .windows);
+    exe.root_module.addOptions("build_options", options);
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
