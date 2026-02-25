@@ -323,8 +323,8 @@ const Interpreter = struct {
             // Comment: backslash skips rest of line
             if (line[i] == '\\') break;
 
-            // Paren comment: ( ... )
-            if (line[i] == '(' and (i + 1 >= line.len or line[i + 1] == ' ')) {
+            // Paren comment: ( ... ) or (comment)
+            if (line[i] == '(') {
                 i += 1;
                 while (i < line.len and line[i] != ')') : (i += 1) {}
                 if (i < line.len) i += 1;
@@ -373,8 +373,8 @@ const Interpreter = struct {
             // Comment: backslash skips rest of line
             if (text[i] == '\\') break;
 
-            // Paren comment: ( ... )
-            if (text[i] == '(' and (i + 1 >= text.len or text[i + 1] == ' ')) {
+            // Paren comment: ( ... ) or (comment)
+            if (text[i] == '(') {
                 i += 1;
                 while (i < text.len and text[i] != ')') : (i += 1) {}
                 if (i < text.len) i += 1;
