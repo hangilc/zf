@@ -1316,7 +1316,11 @@ pub fn main() !void {
 }
 
 fn getHomePath() ?[]const u8 {
-    if (comptime @import("builtin").os.tag == .windows) return null;
+    if (comptime @import("builtin").os.tag == .windows) {
+        // Use C runtime getenv on Windows
+        const ptr = std.c.getenv("USERPROFILE") orelse std.c.getenv("HOME") orelse return null;
+        return std.mem.span(ptr);
+    }
     return std.posix.getenv("HOME");
 }
 
