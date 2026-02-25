@@ -71,7 +71,8 @@ Arithmetic with mixed int/float automatically promotes to float.
 | `+` | `( a b -- a+b )` | Add |
 | `-` | `( a b -- a-b )` | Subtract |
 | `*` | `( a b -- a*b )` | Multiply |
-| `/` | `( a b -- a/b )` | Divide |
+| `/` | `( a b -- a/b )` | Float division (always returns float) |
+| `idiv` | `( a b -- a/b )` | Integer division (truncates) |
 | `mod` | `( a b -- a%b )` | Modulo (integers only) |
 | `negate` | `( n -- -n )` | Negate |
 | `abs` | `( n -- |n| )` | Absolute value |
@@ -179,14 +180,24 @@ With step:
 \ This is a line comment
 
 ( This is an inline comment )
+(This also works)
 
 : square ( n -- n*n ) dup * ;  \ with stack effect
 ```
 
 ### Other
 
+### Type Conversion
+
+| Word | Stack Effect | Description |
+|------|-------------|-------------|
+| `>float` / `s>f` | `( n -- f )` | Convert to float |
+
+### Other
+
 | Word | Description |
 |------|-------------|
+| `clear` | Empty the stack |
 | `bye` | Exit zf |
 
 ## Examples
