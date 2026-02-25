@@ -502,6 +502,8 @@ const Interpreter = struct {
             self.stack.push(a) catch {};
         } else if (std.mem.eql(u8, token, "cr")) {
             try self.stdout.writeAll("\n");
+        } else if (std.mem.eql(u8, token, "clear")) {
+            self.stack.top = 0;
         } else if (std.mem.eql(u8, token, "words")) {
             try self.dict.listWords(self.stdout);
         } else if (token.len == 1 and (token[0] == '+' or token[0] == '-' or token[0] == '*' or token[0] == '/')) {
