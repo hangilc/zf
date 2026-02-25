@@ -521,6 +521,15 @@ const Interpreter = struct {
             self.stack.push(Value{ .float = f }) catch {};
         } else if (std.mem.eql(u8, token, "words")) {
             try self.dict.listWords(self.stdout);
+        } else if (std.mem.eql(u8, token, "idiv")) {
+            doArith(&self.stack, 'd') catch |err| {
+                switch (err) {
+                    error.StackUnderflow => try self.stdout.writeAll("error: stack underflow\n"),
+                    error.DivisionByZero => try self.stdout.writeAll("error: division by zero\n"),
+                    error.TypeError => try self.stdout.writeAll("error: type error\n"),
+                    else => try self.stdout.writeAll("error\n"),
+                }
+            };
         } else if (token.len == 1 and (token[0] == '+' or token[0] == '-' or token[0] == '*' or token[0] == '/')) {
             doArith(&self.stack, token[0]) catch |err| {
                 switch (err) {
@@ -878,6 +887,24 @@ fn doArith(stack: *Stack, op: u8) !void {
     const b = try stack.pop();
     const a = try stack.pop();
 
+    // '/' always does float division, 'd' (idiv) does integer division
+    if (op == '/') {
+        // Float division: convert both to float
+        const fa: f64 = switch (a) {
+            .int => |v| @floatFromInt(v),
+            .float => |v| v,
+            .string => return error.TypeError,
+        };
+        const fb: f64 = switch (b) {
+            .int => |v| @floatFromInt(v),
+            .float => |v| v,
+            .string => return error.TypeError,
+        };
+        if (fb == 0) return error.DivisionByZero;
+        try stack.push(Value{ .float = fa / fb });
+        return;
+    }
+
     if (a == .float or b == .float) {
         const fa: f64 = switch (a) {
             .int => |v| @floatFromInt(v),
@@ -893,7 +920,6 @@ fn doArith(stack: *Stack, op: u8) !void {
             '+' => fa + fb,
             '-' => fa - fb,
             '*' => fa * fb,
-            '/' => if (fb == 0) return error.DivisionByZero else fa / fb,
             else => return error.TypeError,
         };
         try stack.push(Value{ .float = result });
@@ -904,7 +930,7 @@ fn doArith(stack: *Stack, op: u8) !void {
             '+' => ia + ib,
             '-' => ia - ib,
             '*' => ia * ib,
-            '/' => if (ib == 0) return error.DivisionByZero else @divTrunc(ia, ib),
+            'd' => if (ib == 0) return error.DivisionByZero else @divTrunc(ia, ib),
             else => return error.TypeError,
         };
         try stack.push(Value{ .int = result });
