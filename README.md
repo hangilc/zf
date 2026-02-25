@@ -76,6 +76,7 @@ Arithmetic with mixed int/float automatically promotes to float.
 | `mod` | `( a b -- a%b )` | Modulo (integers only) |
 | `negate` | `( n -- -n )` | Negate |
 | `abs` | `( n -- |n| )` | Absolute value |
+| `**` | `( base exp -- base^exp )` | Power (integer exponent) |
 
 ### Comparison
 
