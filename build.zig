@@ -73,7 +73,8 @@ pub fn build(b: *std.Build) void {
     const resolved = exe.root_module.resolved_target.?;
     const os_tag = resolved.result.os.tag;
     if (os_tag != .windows) {
-        exe.root_module.linkSystemLibrary("readline", .{});
+        exe.root_module.linkSystemLibrary("readline", .{ .preferred_link_mode = .static });
+        exe.root_module.linkSystemLibrary("tinfo", .{ .preferred_link_mode = .static });
     }
     exe.linkLibC();
 
