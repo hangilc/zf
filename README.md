@@ -198,3 +198,6 @@ See the `examples/` directory:
 ## License
 
 MIT
+
+Created with helps from OpenClaw and Claude Code.
+
