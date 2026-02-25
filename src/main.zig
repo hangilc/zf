@@ -1,4 +1,8 @@
 const std = @import("std");
+const rl = @cImport({
+    @cInclude("readline/readline.h");
+    @cInclude("readline/history.h");
+});
 
 // === Value ===
 const Value = union(enum) {
@@ -660,6 +664,53 @@ const Interpreter = struct {
                 .float => |v| self.stack.push(Value{ .float = if (v < 0) -v else v }) catch {},
                 .string => try self.stdout.writeAll("error: type error\n"),
             }
+        } else if (std.mem.eql(u8, token, "**")) {
+            const exp_val = self.stack.pop() catch {
+                try self.stdout.writeAll("error: stack underflow\n");
+                return true;
+            };
+            const base_val = self.stack.pop() catch {
+                try self.stdout.writeAll("error: stack underflow\n");
+                return true;
+            };
+            const exp_i = switch (exp_val) {
+                .int => |v| v,
+                else => {
+                    try self.stdout.writeAll("error: ** expects integer exponent\n");
+                    return true;
+                },
+            };
+            switch (base_val) {
+                .int => |base| {
+                    if (exp_i < 0) {
+                        // Negative exponent → float result
+                        const fb: f64 = @floatFromInt(base);
+                        var result: f64 = 1.0;
+                        var e: i64 = -exp_i;
+                        while (e > 0) : (e -= 1) result /= fb;
+                        self.stack.push(Value{ .float = result }) catch {};
+                    } else {
+                        var result: i64 = 1;
+                        var e: i64 = exp_i;
+                        while (e > 0) : (e -= 1) result *= base;
+                        self.stack.push(Value{ .int = result }) catch {};
+                    }
+                },
+                .float => |base| {
+                    var result: f64 = 1.0;
+                    if (exp_i >= 0) {
+                        var e: i64 = exp_i;
+                        while (e > 0) : (e -= 1) result *= base;
+                    } else {
+                        var e: i64 = -exp_i;
+                        while (e > 0) : (e -= 1) result /= base;
+                    }
+                    self.stack.push(Value{ .float = result }) catch {};
+                },
+                .string => {
+                    try self.stdout.writeAll("error: type error\n");
+                },
+            }
         } else {
             try self.stdout.writeAll("unknown word: ");
             try self.stdout.writeAll(token);
@@ -1213,28 +1264,68 @@ pub fn main() !void {
     try stdout.writeAll("zf - a Forth in Zig\n");
 
     const stdin = std.fs.File.stdin();
-    var buf: [1024]u8 = undefined;
+    const is_tty = std.posix.isatty(stdin.handle);
 
-    while (true) {
-        if (interp.compiling) {
-            try stdout.writeAll("  ] ");
-        } else {
-            try stdout.writeAll("zf> ");
-        }
-
-        const line = readLine(stdin, &buf) catch {
-            try stdout.writeAll("\nGoodbye!\n");
-            return;
-        };
-
-        if (line) |input| {
-            const should_continue = try interp.execLine(input);
-            if (!should_continue) return;
-        } else {
-            try stdout.writeAll("\nGoodbye!\n");
-            return;
+    // Load history
+    if (is_tty) {
+        if (getHistoryPath()) |path| {
+            _ = rl.read_history(&path);
         }
     }
+
+    if (is_tty) {
+        while (true) {
+            const prompt: [*c]const u8 = if (interp.compiling) "  ] " else "zf> ";
+            const line_ptr = rl.readline(prompt);
+            if (line_ptr == null) {
+                try stdout.writeAll("\nGoodbye!\n");
+                break;
+            }
+            const line = std.mem.span(line_ptr.?);
+            if (line.len > 0) {
+                rl.add_history(line_ptr.?);
+            }
+            const should_continue = try interp.execLine(line);
+            std.c.free(line_ptr.?);
+            if (!should_continue) break;
+        }
+        // Save history
+        if (getHistoryPath()) |path| {
+            _ = rl.write_history(&path);
+        }
+    } else {
+        // Non-TTY: plain stdin read (pipe mode)
+        var buf: [1024]u8 = undefined;
+        while (true) {
+            if (interp.compiling) {
+                try stdout.writeAll("  ] ");
+            } else {
+                try stdout.writeAll("zf> ");
+            }
+            const line = readLine(stdin, &buf) catch {
+                try stdout.writeAll("\nGoodbye!\n");
+                return;
+            };
+            if (line) |input| {
+                const should_continue = try interp.execLine(input);
+                if (!should_continue) return;
+            } else {
+                try stdout.writeAll("\nGoodbye!\n");
+                return;
+            }
+        }
+    }
+}
+
+fn getHistoryPath() ?[256]u8 {
+    const home = std.posix.getenv("HOME") orelse return null;
+    const suffix = "/.zf_history";
+    if (home.len + suffix.len >= 256) return null;
+    var buf: [256]u8 = undefined;
+    @memcpy(buf[0..home.len], home);
+    @memcpy(buf[home.len .. home.len + suffix.len], suffix);
+    buf[home.len + suffix.len] = 0;
+    return buf;
 }
 
 fn execFile(interp: *Interpreter, path: []const u8) !bool {
