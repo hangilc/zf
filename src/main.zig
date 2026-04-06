@@ -1197,17 +1197,29 @@ pub fn main() !void {
 
     var skip_rc = false;
     var interactive = false;
+    var eval_code: ?[]const u8 = null;
     var file_args: [64][]const u8 = undefined;
     var file_count: usize = 0;
 
-    for (args[1..]) |arg| {
+    var i: usize = 1;
+    while (i < args.len) : (i += 1) {
+        const arg = args[i];
         if (std.mem.eql(u8, arg, "--no-rc") or std.mem.eql(u8, arg, "-n")) {
             skip_rc = true;
         } else if (std.mem.eql(u8, arg, "-i") or std.mem.eql(u8, arg, "--interactive")) {
             interactive = true;
+        } else if (std.mem.eql(u8, arg, "-c")) {
+            i += 1;
+            if (i < args.len) {
+                eval_code = args[i];
+            } else {
+                try stdout.writeAll("error: -c requires an argument\n");
+                return;
+            }
         } else if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
             try stdout.writeAll("Usage: zf [options] [file...]\n");
             try stdout.writeAll("Options:\n");
+            try stdout.writeAll("  -c CODE            Execute CODE and print top of stack\n");
             try stdout.writeAll("  -i, --interactive  Enter REPL after running files\n");
             try stdout.writeAll("  -n, --no-rc        Skip loading ~/.zfrc\n");
             try stdout.writeAll("  -h, --help         Show this help\n");
@@ -1218,6 +1230,98 @@ pub fn main() !void {
                 file_count += 1;
             }
         }
+    }
+
+    if (eval_code) |code| {
+        if (!skip_rc) {
+            if (getHomePath()) |home| {
+                var rc_path_buf: [256]u8 = undefined;
+                const rc_path_len = home.len + 6;
+                if (rc_path_len <= rc_path_buf.len) {
+                    @memcpy(rc_path_buf[0..home.len], home);
+                    @memcpy(rc_path_buf[home.len .. home.len + 6], "/.zfrc");
+                    _ = execFile(&interp, rc_path_buf[0..rc_path_len]) catch {};
+                }
+            }
+        }
+        const trimmed = std.mem.trim(u8, code, &std.ascii.whitespace);
+        if (trimmed.len == 0) {
+            const help = [_][2][]const u8{
+                // Stack
+                .{ ".", "Pop and print top of stack" },
+                .{ ".s", "Display entire stack" },
+                .{ "drop", "Discard top of stack" },
+                .{ "dup", "Duplicate top of stack" },
+                .{ "swap", "Swap top two stack items" },
+                .{ "over", "Copy second item over top" },
+                .{ "rot", "Rotate top three items" },
+                .{ "clear", "Clear the stack" },
+                // Arithmetic
+                .{ "+", "Add ( a b -- a+b )" },
+                .{ "-", "Subtract ( a b -- a-b )" },
+                .{ "*", "Multiply ( a b -- a*b )" },
+                .{ "/", "Divide, float result ( a b -- a/b )" },
+                .{ "idiv", "Integer divide ( a b -- a/b )" },
+                .{ "mod", "Modulo ( a b -- a%b )" },
+                .{ "negate", "Negate top ( n -- -n )" },
+                .{ "abs", "Absolute value ( n -- |n| )" },
+                .{ "**", "Power ( base exp -- base^exp )" },
+                // Comparison
+                .{ "=", "Equal ( a b -- flag )" },
+                .{ "<>", "Not equal ( a b -- flag )" },
+                .{ "<", "Less than ( a b -- flag )" },
+                .{ ">", "Greater than ( a b -- flag )" },
+                .{ "<=", "Less or equal ( a b -- flag )" },
+                .{ ">=", "Greater or equal ( a b -- flag )" },
+                .{ "0=", "True if zero ( n -- flag )" },
+                .{ "not", "Logical not ( flag -- flag )" },
+                .{ "invert", "Same as not" },
+                // Type
+                .{ ">float", "Convert to float" },
+                .{ "s>f", "Same as >float" },
+                // Control flow
+                .{ "if...else...then", "Conditional branch" },
+                .{ "do...loop", "Counted loop ( limit start -- )" },
+                .{ "+loop", "Loop with custom step" },
+                .{ "i", "Current loop index" },
+                .{ "j", "Outer loop index" },
+                // Strings
+                .{ ".\" ...\"", "Print string literal" },
+                .{ "s\" ...\"", "Push string literal" },
+                // Defining
+                .{ ": name ... ;", "Define a new word" },
+                .{ "words", "List user-defined words" },
+                .{ "include file", "Load and execute a file" },
+                // I/O
+                .{ "cr", "Print newline" },
+                .{ "bye", "Exit interpreter" },
+                // Comments
+                .{ "\\ ...", "Line comment" },
+                .{ "( ... )", "Inline comment" },
+            };
+            for (help) |entry| {
+                try stdout.writeAll("  ");
+                try stdout.writeAll(entry[0]);
+                // Pad to 20 chars
+                var pad: usize = if (entry[0].len < 20) 20 - entry[0].len else 1;
+                while (pad > 0) : (pad -= 1) try stdout.writeAll(" ");
+                try stdout.writeAll(entry[1]);
+                try stdout.writeAll("\n");
+            }
+            // List user-defined words if any
+            if (interp.dict.count > 0) {
+                try stdout.writeAll("\nUser-defined:\n  ");
+                try interp.dict.listWords(stdout);
+            }
+            return;
+        }
+        _ = interp.execLine(code) catch {};
+        if (interp.stack.top > 0) {
+            const val = interp.stack.items[interp.stack.top - 1];
+            val.format(stdout) catch {};
+            stdout.writeAll("\n") catch {};
+        }
+        return;
     }
 
     if (file_count > 0) {
