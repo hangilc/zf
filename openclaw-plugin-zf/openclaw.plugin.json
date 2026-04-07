@@ -1,0 +1,13 @@
+{
+  "id": "openclaw-plugin-zf",
+  "name": "ZF Command",
+  "version": "1.0.0",
+  "description": "/zf <args> で zf プログラムを実行する",
+  "main": "dist/index.js",
+  "configSchema": {
+	"type": "object",
+	"additionalProperties": false,
+    "properties": {}
+  }
+}
+
